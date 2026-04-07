@@ -469,9 +469,10 @@ function updateMarkerCard(id){
 
 // ── log panel ──────────────────────────────────────────────────────────────
 function renderDateStrip(){
-  document.getElementById('dateLabelEl').textContent=fmtDate(currentDate);
-  document.getElementById('nextBtn').disabled=currentDate>=todayStr();
-  document.getElementById('todayBtn').style.display=currentDate===todayStr()?'none':'';
+  const isToday=currentDate===todayStr();
+  document.getElementById('dateLabelEl').innerHTML=fmtDate(currentDate)+(isToday?' <span style="font-family:\'DM Mono\',monospace;font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent);margin-left:8px">today</span>':'');
+  document.getElementById('nextBtn').disabled=isToday;
+  document.getElementById('todayBtn').style.display=isToday?'none':'';
 }
 
 function renderLog(){
@@ -518,12 +519,10 @@ function renderLog(){
     } else if(m.type==='number'){
       const unit=m.unit||'';
       inp=`<div class="sleep-row">
-        <button class="sleep-adj" onclick="adjNumber('${m.id}',-1)">&#8722;</button>
-        <div class="sleep-num${hasVal?'':' empty'}" style="color:${m.color}">${hasVal?(val+(unit?`<span class='unit'>${unit}</span>`:'')):'tap ±'}</div>
-        <button class="sleep-adj" onclick="adjNumber('${m.id}',1)">+</button>
-        <input type="number" step="0.1" placeholder="or type…" value="${hasVal?val:''}"
-          style="width:90px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;text-align:center"
+        <input type="number" step="any" placeholder="${unit?'0 '+unit:'enter value'}" value="${hasVal?val:''}"
+          style="width:140px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:8px 12px;color:${m.color};font-family:'DM Mono',monospace;font-size:18px"
           oninput="setMarkerVal('${m.id}',this.value===''?null:parseFloat(this.value),true)">
+        ${unit?`<span style="font-size:12px;color:var(--dim)">${unit}</span>`:''}
       </div>`;
     } else if(m.type==='note'){
       const safe=(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
