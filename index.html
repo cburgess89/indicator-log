@@ -312,6 +312,9 @@ html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'DM
       <input class="add-field" id="customLo" placeholder="Low label (e.g. none)" maxlength="16">
       <input class="add-field" id="customHi" placeholder="High label (e.g. severe)" maxlength="16">
     </div>
+    <div id="unitRow" style="display:none;margin-top:8px">
+      <input class="add-field" id="customUnit" placeholder="Unit label (e.g. lbs, kg, oz)" maxlength="12">
+    </div>
     <span class="form-label">Color</span>
     <div class="swatch-row" id="swatchRow"></div>
     <button class="add-btn" id="form-submit-btn" onclick="submitMarkerForm()">+ Add tracker</button>
@@ -347,11 +350,12 @@ const DEFAULT_MARKERS = [
 const MOODS  = [{v:1,e:'😞'},{v:2,e:'😕'},{v:3,e:'😐'},{v:4,e:'🙂'},{v:5,e:'😄'}];
 const COLORS = ['#f0c050','#50c8f0','#f05090','#c8f050','#50f0a0','#f0a050','#c050f0','#50d0f0','#f07840','#a0e050'];
 const INPUT_TYPES = [
-  {id:'scale', label:'1–10'},
-  {id:'toggle',label:'Yes/No'},
-  {id:'mood',  label:'Mood'},
-  {id:'sleep', label:'Hours'},
-  {id:'note',  label:'Note'},
+  {id:'scale',  label:'1–10'},
+  {id:'toggle', label:'Yes/No'},
+  {id:'mood',   label:'Mood'},
+  {id:'sleep',  label:'Hours'},
+  {id:'number', label:'Number'},
+  {id:'note',   label:'Note'},
 ];
 
 // ── state ──────────────────────────────────────────────────────────────────
@@ -412,6 +416,7 @@ function normalize(v,m){
   if(m.type==='mood')   return (v-1)/4;
   if(m.type==='sleep')  return Math.min(v/10,1);
   if(m.type==='note')   return 0.5;
+  if(m.type==='number') return Math.min(Math.max(v,0)/1000,1);
   return (v-1)/9;
 }
 
@@ -480,6 +485,16 @@ function renderLog(){
         <button class="toggle-opt yes${val===true?' sel':''}" onclick="setMarkerVal('${m.id}',${val===true?'null':'true'})">&#10003; Yes</button>
         <button class="toggle-opt no${val===false?' sel':''}" onclick="setMarkerVal('${m.id}',${val===false?'null':'false'})">&#10007; No</button>
       </div>`;
+    } else if(m.type==='number'){
+      const unit=m.unit||'';
+      inp=`<div class="sleep-row">
+        <button class="sleep-adj" onclick="adjNumber('${m.id}',-1)">&#8722;</button>
+        <div class="sleep-num${hasVal?'':' empty'}" style="color:${m.color}">${hasVal?(val+(unit?`<span class='unit'>${unit}</span>`:'')):'tap ±'}</div>
+        <button class="sleep-adj" onclick="adjNumber('${m.id}',1)">+</button>
+        <input type="number" step="any" placeholder="or type…" value="${hasVal?val:''}"
+          style="width:80px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;text-align:center"
+          oninput="setMarkerVal('${m.id}',this.value===''?null:+this.value)">
+      </div>`;
     } else if(m.type==='note'){
       const safe=(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
       inp=`<textarea class="note-input" placeholder="Write a note…" oninput="setMarkerVal('${m.id}',this.value||null)">${safe}</textarea>`;
@@ -495,10 +510,12 @@ function displayVal(m,val){
   if(m.type==='sleep')  return `<span style="color:var(--accent2)">${val}h</span>`;
   if(m.type==='toggle') return val?`<span style="color:var(--good)">yes</span>`:`<span style="color:var(--accent3)">no</span>`;
   if(m.type==='note')   return `<span style="font-family:'DM Mono';font-size:11px;color:var(--dim);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block">${(val||'').slice(0,24)}</span>`;
+  if(m.type==='number') return `<span style="color:${m.color}">${val}${m.unit?' '+m.unit:''}</span>`;
   return `<span style="color:${m.color}">${val}/10</span>`;
 }
 
 function adjSleep(d){ const c=getDayData().sleep??7; setMarkerVal('sleep',Math.max(0,Math.min(14,+(c+d).toFixed(1)))) }
+function adjNumber(id,d){ const c=getDayData()[id]??0; setMarkerVal(id,+(c+d).toFixed(2)) }
 function shiftDate(n){ currentDate=addDays(currentDate,n); renderLog() }
 function goToday(){ currentDate=todayStr(); renderLog() }
 function syncToday(){ if(currentDate===todayStr()) return; currentDate=todayStr(); renderLog(); }
@@ -517,6 +534,7 @@ function formatTrendVal(m,v){
   if(m.type==='mood')   return MOODS.find(x=>x.v===v)?.e??v;
   if(m.type==='sleep')  return v+'h';
   if(m.type==='toggle') return v?'Yes':'No';
+  if(m.type==='number') return v+(m.unit?' '+m.unit:'');
   return v+'/10';
 }
 
@@ -661,6 +679,7 @@ function renderHistory(){
       if(m.type==='mood') disp=MOODS.find(x=>x.v===v)?.e??v;
       else if(m.type==='sleep') disp=v+'h';
       else if(m.type==='toggle') disp=v?'✓':'✗';
+      else if(m.type==='number') disp=v+(m.unit?' '+m.unit:'');
       else if(m.type==='note') disp=(v||'').slice(0,18)+((v||'').length>18?'…':'');
       else disp=v+'/10';
       return `<div class="chip"><div class="chip-dot" style="background:${m.color}"></div>${m.label.split(' ')[0]}: ${disp}</div>`;
@@ -743,10 +762,12 @@ function renderAddForm(){
   document.getElementById('customName').value=editing?editing.label:'';
   document.getElementById('customLo').value=editing?editing.lo??'':'';
   document.getElementById('customHi').value=editing?editing.hi??'':'';
+  document.getElementById('customUnit').value=editing?editing.unit??'':'';
   document.getElementById('typePickerRow').innerHTML=INPUT_TYPES.map(t=>
     `<button class="type-pill${newType===t.id?' sel':''}" ${editing?'disabled style="opacity:.4;cursor:default"':''} onclick="${editing?'':'pickType(\''+t.id+'\')'}">${t.label}</button>`
   ).join('');
   document.getElementById('scaleLabelsRow').style.display=newType==='scale'?'flex':'none';
+  document.getElementById('unitRow').style.display=newType==='number'?'block':'none';
   document.getElementById('swatchRow').innerHTML=COLORS.map(c=>
     `<div class="swatch${newColor===c?' sel':''}" style="background:${c}" onclick="pickColor('${c}')"></div>`
   ).join('');
@@ -775,15 +796,19 @@ function submitMarkerForm(){
   if(!name){ showToast('Enter a name first','error'); return; }
   const lo=document.getElementById('customLo').value.trim()||'low';
   const hi=document.getElementById('customHi').value.trim()||'high';
+  const unit=document.getElementById('customUnit').value.trim();
   if(editingId){
     const m=markers.find(x=>x.id===editingId); if(!m) return;
     m.label=name; m.color=newColor; m.type=newType;
-    if(newType==='scale'){ m.lo=lo; m.hi=hi; } else { delete m.lo; delete m.hi; }
+    if(newType==='scale'){ m.lo=lo; m.hi=hi; delete m.unit; }
+    else if(newType==='number'){ m.unit=unit; delete m.lo; delete m.hi; }
+    else { delete m.lo; delete m.hi; delete m.unit; }
     saveConfig(); editingId=null; newType='scale'; newColor=COLORS[4];
     renderSettingsList(); renderAddForm(); renderLog();
     showToast('✓ '+name+' updated','ok');
   } else {
-    markers.push({ id:uid(), label:name, color:newColor, type:newType, enabled:true, custom:true, ...(newType==='scale'?{lo,hi}:{}) });
+    const extra=newType==='scale'?{lo,hi}:newType==='number'?{unit}:{};
+    markers.push({ id:uid(), label:name, color:newColor, type:newType, enabled:true, custom:true, ...extra });
     saveConfig();
     renderSettingsList(); renderLog();
     showToast('✓ '+name+' added','ok');
@@ -791,6 +816,7 @@ function submitMarkerForm(){
   document.getElementById('customName').value='';
   document.getElementById('customLo').value='';
   document.getElementById('customHi').value='';
+  document.getElementById('customUnit').value='';
 }
 
 // ── export / import ────────────────────────────────────────────────────────
