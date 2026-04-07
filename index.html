@@ -430,11 +430,41 @@ function showToast(msg,type='ok'){
 
 // ── day data ───────────────────────────────────────────────────────────────
 function getDayData(){ return allData[currentDate]||{} }
-function setMarkerVal(id,val){
+function setMarkerVal(id,val,skipRender){
   if(!allData[currentDate]) allData[currentDate]={};
   if(val===null||val===undefined) delete allData[currentDate][id];
   else allData[currentDate][id]=val;
-  saveStorage(); renderLog();
+  saveStorage();
+  if(skipRender) updateMarkerCard(id);
+  else renderLog();
+}
+
+function updateMarkerCard(id){
+  const m=markers.find(x=>x.id===id); if(!m) return;
+  const val=getDayData()[id], hasVal=val!==null&&val!==undefined;
+  // update card border
+  const cards=document.querySelectorAll('#markersGrid .marker-card');
+  const em=enabledMarkers(); const idx=em.findIndex(x=>x.id===id);
+  if(idx<0||!cards[idx]) return;
+  cards[idx].classList.toggle('logged',hasVal);
+  // update the value display in the header
+  const valEl=cards[idx].querySelector('.marker-val');
+  if(valEl){
+    if(hasVal){ valEl.className='marker-val'; valEl.innerHTML=displayVal(m,val); }
+    else { valEl.className='marker-val empty'; valEl.textContent='not logged'; }
+  }
+  // update clear btn
+  const existing=cards[idx].querySelector('.clear-btn');
+  if(hasVal&&!existing){
+    const btn=document.createElement('button');
+    btn.className='clear-btn'; btn.innerHTML='&#215;';
+    btn.onclick=()=>setMarkerVal(id,null);
+    valEl?.after(btn);
+  } else if(!hasVal&&existing){ existing.remove(); }
+  // update logged count
+  const day=getDayData(), em2=enabledMarkers();
+  const logged=em2.filter(x=>{ const v=day[x.id]; return v!==null&&v!==undefined; });
+  document.getElementById('loggedCount').textContent=logged.length+'/'+em2.length+' logged';
 }
 
 // ── log panel ──────────────────────────────────────────────────────────────
@@ -491,13 +521,13 @@ function renderLog(){
         <button class="sleep-adj" onclick="adjNumber('${m.id}',-1)">&#8722;</button>
         <div class="sleep-num${hasVal?'':' empty'}" style="color:${m.color}">${hasVal?(val+(unit?`<span class='unit'>${unit}</span>`:'')):'tap ±'}</div>
         <button class="sleep-adj" onclick="adjNumber('${m.id}',1)">+</button>
-        <input type="number" step="any" placeholder="or type…" value="${hasVal?val:''}"
-          style="width:80px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;text-align:center"
-          oninput="setMarkerVal('${m.id}',this.value===''?null:+this.value)">
+        <input type="number" step="0.1" placeholder="or type…" value="${hasVal?val:''}"
+          style="width:90px;background:var(--bg);border:1.5px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--text);font-family:'DM Mono',monospace;font-size:13px;text-align:center"
+          oninput="setMarkerVal('${m.id}',this.value===''?null:parseFloat(this.value),true)">
       </div>`;
     } else if(m.type==='note'){
       const safe=(val||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
-      inp=`<textarea class="note-input" placeholder="Write a note…" oninput="setMarkerVal('${m.id}',this.value||null)">${safe}</textarea>`;
+      inp=`<textarea class="note-input" placeholder="Write a note…" oninput="setMarkerVal('${m.id}',this.value||null,true)">${safe}</textarea>`;
     }
     card.innerHTML=top+inp; grid.appendChild(card);
   });
