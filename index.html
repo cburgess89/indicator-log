@@ -689,6 +689,27 @@ function renderTrends(){
     <div class="kpi-value" style="color:${color}">${pct}<span style="font-family:'DM Mono',monospace;font-size:18px;color:var(--dim)">%</span></div>
     <div class="kpi-sub">${onDay} of ${trackedDates.length} days in range · <span style="color:${color}">${pct>=80?'high confidence':pct>=50?'moderate confidence':'low confidence'}</span></div>
   `;
+
+  // KPI: average for each number-type marker (active in trend, over selected range)
+  const kpiRow=document.querySelector('.kpi-row');
+  kpiRow.querySelectorAll('.kpi-num').forEach(el=>el.remove());
+  kpiRow.insertBefore(document.getElementById('kpiOnDay'),kpiRow.firstChild);
+  em.filter(m=>(m.type==='number'||m.type==='sleep')&&activeTrend.includes(m.id)).forEach(m=>{
+    const vals=dates.map(d=>allData[d]?.[m.id]).filter(v=>v!==null&&v!==undefined);
+    if(!vals.length) return;
+    const avg=vals.reduce((a,b)=>a+b,0)/vals.length;
+    const disp=Number.isInteger(avg)?avg:avg.toFixed(1);
+    const unit=m.type==='sleep'?'hr':(m.unit||'');
+    const card=document.createElement('div');
+    card.className='kpi-card kpi-num';
+    card.innerHTML=`
+      <div class="kpi-label">${m.label} · avg</div>
+      <div class="kpi-value" style="color:${m.color}">${disp}${unit?`<span style="font-family:'DM Mono',monospace;font-size:18px;color:var(--dim)"> ${unit}</span>`:''}
+      </div>
+      <div class="kpi-sub">${vals.length} of ${dates.length} days logged</div>
+    `;
+    kpiRow.appendChild(card);
+  });
 }
 
 function toggleTrend(id){ activeTrend.includes(id)?activeTrend=activeTrend.filter(x=>x!==id):activeTrend.push(id); renderTrends() }
